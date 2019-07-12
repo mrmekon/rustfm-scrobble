@@ -2,7 +2,6 @@
 //!
 //! Client for the Last.fm Scrobble API v2.0.
 
-extern crate reqwest;
 extern crate crypto;
 
 #[macro_use]
@@ -17,6 +16,7 @@ mod scrobbler;
 mod client;
 mod auth;
 mod models;
+mod http;
 
 pub use scrobbler::{Scrobbler, ScrobblerError};
 pub use models::metadata::{Scrobble, ScrobbleBatch};

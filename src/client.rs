@@ -1,9 +1,7 @@
 // Last.fm scrobble API 2.0 client
 
 use std::collections::HashMap;
-use std::io::Read;
-use reqwest;
-use reqwest::{Client, StatusCode};
+use http::{http, HttpMethod, HttpResponse, QueryString};
 use serde_json;
 
 use auth::AuthCredentials;
@@ -32,17 +30,14 @@ impl ApiOperation {
 
 pub struct LastFmClient {
     auth: AuthCredentials,
-    http_client: Client,
 }
 
 impl LastFmClient {
     pub fn new(api_key: String, api_secret: String) -> LastFmClient {
         let partial_auth = AuthCredentials::new_partial(api_key, api_secret);
-        let http_client = Client::new();
 
         LastFmClient {
             auth: partial_auth,
-            http_client: http_client,
         }
     }
 
@@ -146,17 +141,16 @@ impl LastFmClient {
         self.api_request(operation, req_params)
     }
 
-    fn api_request(&self, operation: ApiOperation, params: HashMap<String, String>) -> Result<String, String> {            
+    fn api_request(&self, operation: ApiOperation, params: HashMap<String, String>) -> Result<String, String> {
         match self.send_request(operation, params) {
-            Ok(mut resp) => {
-                let status = resp.status();
-                if status != StatusCode::OK {
+            Ok(resp) => {
+                let status = resp.code.unwrap_or(500);
+                if status != 200 {
                     return Err(format!("Non Success status ({})", status));
                 }
 
-                let mut resp_body = String::new();
-                match resp.read_to_string(&mut resp_body) {
-                    Ok(_) => Ok(resp_body),
+                match resp.data {
+                    Ok(resp) => Ok(resp),
                     Err(_) => Err("Failed to read response body".to_string())
                 }
             },
@@ -164,7 +158,7 @@ impl LastFmClient {
         }
     }
 
-    fn send_request(&self, operation: ApiOperation, params: HashMap<String, String>) -> Result<reqwest::Response, reqwest::Error> {
+    fn send_request(&self, operation: ApiOperation, params: HashMap<String, String>) -> Result<HttpResponse, std::io::Error> {
         let url = "https://ws.audioscrobbler.com/2.0/?format=json";
         let signature = self.auth.get_signature(operation.to_string(), &params);
 
@@ -172,10 +166,12 @@ impl LastFmClient {
         req_params.insert("method".to_string(), operation.to_string());
         req_params.insert("api_sig".to_string(), signature);
 
-        self.http_client
-            .post(url)
-            .form(&req_params)
-            .send()
+        let mut query = QueryString::new();
+        for (key, value) in &req_params {
+            query.add(key, value);
+        }
+        let query = query.build();
+        Ok(http(url, Some(&query), None, HttpMethod::POST))
     }
 
 }

@@ -128,7 +128,7 @@ impl Error for ScrobblerError {
         self.err_msg.as_str()
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         None
     }
 }
